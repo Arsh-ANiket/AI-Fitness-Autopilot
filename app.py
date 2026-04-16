@@ -5,6 +5,7 @@ from modules.workout_logger import initialize_file, add_workout, get_workouts
 from modules.planner import get_suggestion
 from modules.progress import get_exercise_progress, get_progress_insight
 from modules.calories import calculate_bmr, calculate_maintenance, get_calorie_target
+from modules.predictor import predict_fat_loss
 
 # --- INIT ---
 initialize_file()
@@ -116,41 +117,96 @@ with tab3:
 
 # nutrition
 with tab4:
-    st.header("Calorie Intelligence")
+    st.header("🍽️ Your Daily Fitness Plan")
 
+    st.write("Fill your details and get a personalized plan 👇")
+    use_advanced = st.toggle("Use advanced workout tracking (optional)")
+    # --- USER INPUT ---
     col1, col2, col3 = st.columns(3)
+
     with col1:
-        weight = st.number_input("Weight (kg)", value=100)
+        weight = st.number_input("Your Weight (kg)", value=100)
+
     with col2:
-        height = st.number_input("Height (cm)", value=180)
+        height = st.number_input("Your Height (cm)", value=180)
+
     with col3:
-        age = st.number_input("Age", value=25)
+        age = st.number_input("Your Age", value=25)
 
     activity_options = {
-        "Sedentary": 1.2,
-        "Light": 1.375,
-        "Moderate": 1.55,
-        "Very Active": 1.725,
+        "Mostly Sitting (Office Work)": 1.2,
+        "Light Activity (Gym 2-3 days)": 1.375,
+        "Moderate (Gym 4-5 days)": 1.55,
+        "Very Active (Daily intense training)": 1.725,
     }
-    activity_label = st.selectbox("Activity Level", list(activity_options.keys()))
+
+    activity_label = st.selectbox(
+        "Your Daily Activity Level", list(activity_options.keys())
+    )
+
     activity = activity_options[activity_label]
-    goal = st.selectbox("Goal", ["Fat Loss", "Maintain", "Muscle Gain"])
+
+    goal = st.selectbox("Your Goal", ["Fat Loss", "Maintain Weight", "Muscle Gain"])
+
+    # --- CALCULATIONS ---
     bmr = calculate_bmr(weight, height, age)
     maintenance = calculate_maintenance(bmr, activity)
+    if use_advanced:
+        st.subheader("Wokrout adjustment")
+        workout_calories = st.number_input(
+            "Estimated calories burned from workouts (kcal/day)", value=300
+        )
+        maintenance += workout_calories
     target = get_calorie_target(goal, maintenance)
-    st.subheader("Results")
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("BMR", f"{int(bmr)} kcal/day")
-    with col2:
-        st.metric("Maintenance", f"{int(maintenance)} kcal/day")
-    with col3:
-        st.metric("Target Calories", f"{int(target)} kcal/day")
+    # --- RESULTS ---
+    st.subheader("📊 Your Plan")
+
+    st.success(f"👉 You should eat around **{int(target)} kcal/day**")
 
     if goal == "Fat Loss":
-        st.info("Maintain a calorie deficit to lose fat")
+        st.info("🔥 This will help you lose ~0.5 kg per week safely")
     elif goal == "Muscle Gain":
-        st.info("Maintain a calorie surplus to gain muscle")
+        st.info("💪 Eat high protein along with this calorie target")
     else:
-        st.info("Maintain your current calorie intake to stay the same")
+        st.info("⚖️ This will help you maintain your current weight")
+
+    # --- EXPANDABLE EXPLANATION ---
+    with st.expander("📘 Want to understand how this works?"):
+        st.write(
+            f"""
+        - Your body needs around **{int(maintenance)} kcal/day** to maintain weight  
+        - Based on your goal, we adjust calories  
+        - Fat loss = eat less  
+        - Muscle gain = eat more  
+        """
+        )
+
+    # =========================
+    # 🎯 GOAL PREDICTION
+    # =========================
+    st.subheader("🎯 Your Goal Timeline")
+
+    target_weight = st.number_input("Target Weight (kg)", value=80)
+
+    result = predict_fat_loss(weight, target_weight, maintenance, target)
+
+    if "weekly_loss" in result:
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.metric("Expected Fat Loss", f"{result['weekly_loss']} kg/week")
+
+        with col2:
+            st.metric("Time to Goal", f"{result['weeks_needed']} weeks")
+
+        st.success(result["message"])
+
+        # 🔥 SMART INSIGHT
+        if result["weeks_needed"] > 40:
+            st.warning(
+                "⚠️ This is a long timeline. Consider increasing activity or reducing calories slightly."
+            )
+
+    else:
+        st.warning(result["message"])
