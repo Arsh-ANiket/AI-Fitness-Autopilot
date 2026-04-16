@@ -4,6 +4,7 @@ import pandas as pd
 from modules.workout_logger import initialize_file, add_workout, get_workouts
 from modules.planner import get_suggestion
 from modules.progress import get_exercise_progress, get_progress_insight
+from modules.calories import calculate_bmr, calculate_maintenance, get_calorie_target
 
 # --- INIT ---
 initialize_file()
@@ -36,7 +37,9 @@ EXERCISE_MAP = {
 st.title("💪 AI Fitness Autopilot")
 
 # --- Tabs ---
-tab1, tab2, tab3 = st.tabs(["🏋️ Log Workout", "📊 Progress", "📜 History"])
+tab1, tab2, tab3, tab4 = st.tabs(
+    ["🏋️ Log Workout", "📊 Progress", "📜 History", "🍽️ Nutrition"]
+)
 
 # =========================
 # 🏋️ TAB 1 — WORKOUT LOG
@@ -110,3 +113,44 @@ with tab3:
 
     df = get_workouts()
     st.dataframe(df)
+
+# nutrition
+with tab4:
+    st.header("Calorie Intelligence")
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        weight = st.number_input("Weight (kg)", value=100)
+    with col2:
+        height = st.number_input("Height (cm)", value=180)
+    with col3:
+        age = st.number_input("Age", value=25)
+
+    activity_options = {
+        "Sedentary": 1.2,
+        "Light": 1.375,
+        "Moderate": 1.55,
+        "Very Active": 1.725,
+    }
+    activity_label = st.selectbox("Activity Level", list(activity_options.keys()))
+    activity = activity_options[activity_label]
+    goal = st.selectbox("Goal", ["Fat Loss", "Maintain", "Muscle Gain"])
+    bmr = calculate_bmr(weight, height, age)
+    maintenance = calculate_maintenance(bmr, activity)
+    target = get_calorie_target(goal, maintenance)
+    st.subheader("Results")
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("BMR", f"{int(bmr)} kcal/day")
+    with col2:
+        st.metric("Maintenance", f"{int(maintenance)} kcal/day")
+    with col3:
+        st.metric("Target Calories", f"{int(target)} kcal/day")
+
+    if goal == "Fat Loss":
+        st.info("Maintain a calorie deficit to lose fat")
+    elif goal == "Muscle Gain":
+        st.info("Maintain a calorie surplus to gain muscle")
+    else:
+        st.info("Maintain your current calorie intake to stay the same")
